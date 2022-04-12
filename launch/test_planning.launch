@@ -1,0 +1,76 @@
+<launch>
+    <node pkg="tf" type="static_transform_publisher" name="world_map" args="0 0 0 0 0 0 world map 10"/>
+    <node pkg="oaisys_client" type="oaisys_planner_node" name="test_planner" output="screen">
+        <param name="origin_x" value="0.0"/>
+        <param name="origin_y" value="0.0"/>
+        <param name="origin_z" value="15.0"/>
+    </node>
+    <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" />
+    <node pkg="nodelet" type="nodelet" name="nodelet1"
+            args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager">
+        <remap from="rgb/camera_info" to="/info"/>
+        <remap from="rgb/image_rect_color" to="/image"/>
+        <remap from="depth_registered/image_rect" to="/depth"/>
+        <remap from="depth_registered/points" to="/camera/depth/points"/>
+    </node>
+
+    <arg name="voxel_size" default="0.5" />
+    <arg name="voxels_per_side" default="16" />
+    <arg name="method" default="merged"/>
+  
+   <node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="screen" args="-alsologtostderr" clear_params="true">
+    <remap from="pointcloud" to="/camera/depth/points"/>
+    <param name="tsdf_voxel_size" value="$(arg voxel_size)" />
+    <param name="tsdf_voxels_per_side" value="16" />
+    <param name="publish_tsdf_map" value="true" />
+    <param name="publish_esdf_map" value="true" />
+    <!-- <param name="voxel_carving_enabled" value="false" /> -->
+    <param name="color_mode" value="color" />
+    <param name="use_tf_transforms" value="false" />
+    <param name="update_mesh_every_n_sec" value="10.0" />
+    <param name="min_time_between_msgs_sec" value="0.0" />
+    <param name="method" value="merged" />
+    <param name="use_const_weight" value="false" />
+    <param name="allow_clear" value="true" />
+    <param name="verbose" value="false" />
+    <param name="world_frame" value="world" />
+    <param name="sensor_frame" value="camera" />
+    <remap from="transform" to="/transform" />
+    <param name="max_ray_length_m" value="100.0" />
+    <param name="mesh_filename" value="$(find voxblox_ros)/mesh_results/$(anon cow).ply" />
+  </node>
+
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find oaisys_client)/launch/config.rviz" />
+
+  <!--  Experiment arguments -->  
+  <arg name="experiment_config" default="CityBuilding.yaml"/>
+  <arg name="planner_config" default="planners/reconstruction_planner.yaml"/>
+
+  <!-- Load experiment config -->
+  <rosparam command="load" file="$(find active_3d_planning_app_reconstruction)/cfg/experiments/$(arg experiment_config)"/>
+
+  <!-- Planner -->
+  <node name="planner_node" pkg="active_3d_planning_app_reconstruction" type="reconstruction_planner_node" output="screen">
+    <!-- Voxblox Server -->
+    <param name="max_ray_length_m" value="30.0" />
+    <remap from="planner_node/esdf_map_in" to="/voxblox_node/esdf_map_out" />
+    <remap from="planner_node/tsdf_map_in" to="/voxblox_node/tsdf_map_out" />
+    <param name="use_tf_transforms" value="false" />
+    <param name="tsdf_voxel_size" value="$(arg voxel_size)" />
+    <param name="tsdf_voxels_per_side" value="$(arg voxels_per_side)" />
+    <param name="update_mesh_every_n_sec" value="0.0" />   
+    <param name="publish_traversable" value="true" />    
+    <param name="publish_pointclouds" value="true" />              
+    <param name="visualize" value="true"/>
+    <!-- General Settings -->
+    <remap from="odometry" to="/ground_truth/odometry" />
+    <remap from="command/trajectory" to="/reference/command/trajectory" />
+    <!-- <remap from="command/trajectory" to="/$(arg mav_name)/command/trajectory" /> -->
+    <!-- Experiment dependent -->
+    <param name="trajectory_evaluator/bounding_volume_args" value="/target_bounding_volume" />
+    <param name="trajectory_generator/bounding_volume_args" value="/map_bounding_volume" />
+    
+    <!-- Build the Planner by Configuration     -->
+    <rosparam command="load" file="$(find active_3d_planning_app_reconstruction)/cfg/$(arg planner_config)"/>
+  </node>
+</launch>
