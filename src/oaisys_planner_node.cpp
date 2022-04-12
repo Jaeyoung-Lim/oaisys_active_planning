@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh_private("~");
 
   auto oaisys_planner = std::make_shared<OaisysPlanner>(nh, nh_private);
+  oaisys_planner->initialize(true);
 
   ros::spin();
   return 0;

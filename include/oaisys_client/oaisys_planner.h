@@ -26,6 +26,18 @@ class OaisysPlanner {
   OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &nh_private);
   ~OaisysPlanner(){};
 
+  /**
+   * @brief
+   *
+   * @param spinner Enable spinner
+   */
+  void initialize(bool spinner);
+  /**
+   * @brief Step sample
+   *
+   */
+  void stepSample(const Eigen::Vector3d &position, const Eigen::Quaterniond &vehicle_attitude);
+
  private:
   /**
    * @brief Construct a new statusloop Callback object
@@ -33,6 +45,7 @@ class OaisysPlanner {
    * @param event
    */
   void statusloopCallback(const ros::TimerEvent &event);
+
   /**
    * @brief Convert roll pitch yaw to quaternions
    *
@@ -63,7 +76,7 @@ class OaisysPlanner {
   void PublishViewpointImage(const ros::Publisher &pub, const cv::Mat &image, const ros::Time time,
                              const std::string encoding);
   void publishCameraInfo(const ros::Publisher &pub, const ros::Time time, const Eigen::Vector3d &position);
-  void publishTransforms(const ros::Publisher &pub, const Eigen::Vector3d &position, Eigen::Quaterniond attitude);
+  void publishTransforms(const ros::Publisher &pub, const ros::Time time, const Eigen::Vector3d &position, Eigen::Quaterniond attitude);
 
   /**
    * @brief Publish odometry of the viewpoint
@@ -102,7 +115,7 @@ class OaisysPlanner {
    */
   Eigen::Vector4d view_attitude_;
 
-  Eigen::Vector4d sensor_offset_{Eigen::Vector4d(std::cos(0.5 * 0.0 / 4), 0.0, -std::sin(0.5 * 0.0 / 4), 0.0)};
+  Eigen::Vector4d sensor_offset_{Eigen::Vector4d(std::cos(0.5 * M_PI / 4), 0.0, -std::sin(0.5 * M_PI / 4), 0.0)};
   bool new_viewpoint_{true};
   bool batch_created_{false};
 };

@@ -15,22 +15,19 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   nh_private.param<double>("origin_x", origin_x, origin_x);
   nh_private.param<double>("origin_y", origin_y, origin_y);
   nh_private.param<double>("origin_z", origin_z, origin_z);
+  double mounting_rotation_w{1.0};
+  double mounting_rotation_x{0.0};
+  double mounting_rotation_y{0.0};
+  double mounting_rotation_z{0.0};
 
+  nh_private.param<double>("mounting_rotation_w", mounting_rotation_w, mounting_rotation_w);
+  nh_private.param<double>("mounting_rotation_x", mounting_rotation_x, mounting_rotation_x);
+  nh_private.param<double>("mounting_rotation_y", mounting_rotation_y, mounting_rotation_y);
+  nh_private.param<double>("mounting_rotation_z", mounting_rotation_z, mounting_rotation_z);
+  sensor_offset_ << mounting_rotation_w, mounting_rotation_x, mounting_rotation_y, mounting_rotation_z;
+  sensor_offset_.normalize();
+  
   oaisys_client_ = std::make_shared<OaisysClient>();
-
-  if (!oaisys_client_->StepBatch()) {
-    std::cout << "[OaisysPlanner] StepBatch service failed" << std::endl;
-  }
-  /// TODO: This is a workaround so that oaisys doesn't crash. Not a good idea to sleep in the cosntructor!
-  ros::Duration(5.0).sleep();
-
-  double statusloop_dt_ = 2.0;
-  ros::TimerOptions statuslooptimer_options(
-      ros::Duration(statusloop_dt_), boost::bind(&OaisysPlanner::statusloopCallback, this, _1), &statusloop_queue_);
-  statusloop_timer_ = nh_.createTimer(statuslooptimer_options);  // Define timer for constant loop rate
-
-  statusloop_spinner_.reset(new ros::AsyncSpinner(1, &statusloop_queue_));
-  statusloop_spinner_->start();
 
   // Publish initial odometry
   const Eigen::Vector3d origin(origin_x, origin_y, origin_z);
@@ -45,7 +42,13 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   publishOdometry(odometry_pub, origin, view_attitude);
 }
 
-void OaisysPlanner::statusloopCallback(const ros::TimerEvent &event) {
+void OaisysPlanner::initialize(bool spinner) {
+  if (!oaisys_client_->StepBatch()) {
+    std::cout << "[OaisysPlanner] StepBatch service failed" << std::endl;
+  }
+  /// TODO: This is a workaround so that oaisys doesn't crash. Not a good idea to sleep in the cosntructor!
+  ros::Duration(5.0).sleep();
+
   if (!batch_created_) {
     int batch_finished{0};
     while (!oaisys_client_->BatchCreationFinished(batch_finished)) {
@@ -56,62 +59,80 @@ void OaisysPlanner::statusloopCallback(const ros::TimerEvent &event) {
     batch_created_ = true;
   }
 
+  if (spinner) {
+    double statusloop_dt_ = 2.0;
+    ros::TimerOptions statuslooptimer_options(
+        ros::Duration(statusloop_dt_), boost::bind(&OaisysPlanner::statusloopCallback, this, _1), &statusloop_queue_);
+    statusloop_timer_ = nh_.createTimer(statuslooptimer_options);  // Define timer for constant loop rate
+
+    statusloop_spinner_.reset(new ros::AsyncSpinner(1, &statusloop_queue_));
+    statusloop_spinner_->start();
+  }
+}
+
+void OaisysPlanner::statusloopCallback(const ros::TimerEvent &event) {
   if (new_viewpoint_) {
     const std::lock_guard<std::mutex> lock(viewpoint_mutex);
     std::cout << "[OaisysPlanner] Adding new viewpoint" << std::endl;
-    int batch_id, sample_id;
-    Eigen::Vector3d position = view_position_;
     Eigen::Quaterniond vehicle_attitude;
     vehicle_attitude.w() = view_attitude_(0);
     vehicle_attitude.x() = view_attitude_(1);
     vehicle_attitude.y() = view_attitude_(2);
     vehicle_attitude.z() = view_attitude_(3);
-    publishOdometry(odometry_pub, position, vehicle_attitude);
-
-    Eigen::Quaterniond sensor_attitude;
-    Eigen::Vector4d sensor_attitude_v = quatMultiplication(sensor_offset_, view_attitude_);
-    sensor_attitude.w() = sensor_attitude_v(0);
-    sensor_attitude.x() = sensor_attitude_v(1);
-    sensor_attitude.y() = sensor_attitude_v(2);
-    sensor_attitude.z() = sensor_attitude_v(3);
-
-    oaisys_client_->StepSample(position, sensor_attitude, batch_id, sample_id);
-    std::cout << "[OaisysPlanner] Running!: " << position.transpose() << std::endl;
-    std::cout << "[OaisysPlanner]   - batch ID: " << batch_id << std::endl;
-    std::cout << "[OaisysPlanner]   - sample ID: " << sample_id << std::endl;
-    std::cout << "[OaisysPlanner]   - attitude: " << view_attitude_.w() << ", " << view_attitude_.x() << ", "
-              << view_attitude_.y() << ", " << view_attitude_.z() << std::endl;
-    std::cout << "[OaisysPlanner]   - position: " << position.x() << ", " << position.y() << ", " << position.z()
-              << std::endl;
-    std::cout << "[OaisysPlanner] Waiting for the render to be finished" << std::endl;
-    bool render_finished{false};
-    std::vector<std::string> filepath_list;
-    while (!oaisys_client_->RenderFinished(render_finished, filepath_list)) {
-      ros::Duration(1.0).sleep();
-    }
-    std::cout << "[OaisysPlanner] Render finished" << std::endl;
-    std::string exr_path;
-    std::string rgb_path;
-    for (auto filepath : filepath_list) {
-      std::string file_extension = filepath.substr(filepath.find_last_of(".") + 1);
-      if (file_extension == "exr") exr_path = filepath;
-      if (file_extension == "png") rgb_path = filepath;
-    }
-    std::cout << "[OaisysPlanner]   - rgb file path: " << rgb_path << std::endl;
-    std::cout << "[OaisysPlanner]   - exr file path: " << exr_path << std::endl;
-    cv::Mat rgb_image = cv::imread(rgb_path, cv::IMREAD_COLOR);
-    cv::Mat depth_image = cv::imread(exr_path, cv::IMREAD_ANYDEPTH);
-
-    ros::Time now_stamp = ros::Time::now();
-    PublishViewpointImage(image_pub, rgb_image, now_stamp, sensor_msgs::image_encodings::BGR8);
-    PublishViewpointImage(depth_pub, depth_image, now_stamp, sensor_msgs::image_encodings::TYPE_32FC1);
-    publishCameraInfo(info_pub, now_stamp, position);
-    publishTransforms(transforms_pub, position, sensor_attitude);
-
+    stepSample(view_position_, vehicle_attitude);
     new_viewpoint_ = false;
   } else {
     std::cout << "[OaisysPlanner] Waiting for viewpoint..." << std::endl;
   }
+}
+
+void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Quaterniond &vehicle_attitude) {
+  int batch_id, sample_id;
+  publishOdometry(odometry_pub, position, vehicle_attitude);
+
+  Eigen::Quaterniond sensor_attitude;
+  Eigen::Vector4d sensor_attitude_v = quatMultiplication(
+      Eigen::Vector4d(vehicle_attitude.w(), vehicle_attitude.x(), vehicle_attitude.y(), vehicle_attitude.z()), sensor_offset_);
+  sensor_attitude.w() = sensor_attitude_v(0);
+  sensor_attitude.x() = sensor_attitude_v(1);
+  sensor_attitude.y() = sensor_attitude_v(2);
+  sensor_attitude.z() = sensor_attitude_v(3);
+
+  Eigen::Vector3d blender_position(-position.x(), -position.y(), position.z());
+  Eigen::Quaterniond blender_attitude(sensor_attitude.w(), -sensor_attitude.x(), -sensor_attitude.y(), sensor_attitude.z());
+
+  oaisys_client_->StepSample(blender_position, blender_attitude, batch_id, sample_id);
+  std::cout << "[OaisysPlanner] Running!: " << position.transpose() << std::endl;
+  std::cout << "[OaisysPlanner]   - batch ID: " << batch_id << std::endl;
+  std::cout << "[OaisysPlanner]   - sample ID: " << sample_id << std::endl;
+  std::cout << "[OaisysPlanner]   - attitude: " << view_attitude_.w() << ", " << view_attitude_.x() << ", "
+            << view_attitude_.y() << ", " << view_attitude_.z() << std::endl;
+  std::cout << "[OaisysPlanner]   - position: " << position.x() << ", " << position.y() << ", " << position.z()
+            << std::endl;
+  std::cout << "[OaisysPlanner] Waiting for the render to be finished" << std::endl;
+  bool render_finished{false};
+  std::vector<std::string> filepath_list;
+  while (!oaisys_client_->RenderFinished(render_finished, filepath_list)) {
+    ros::Duration(1.0).sleep();
+  }
+  std::cout << "[OaisysPlanner] Render finished" << std::endl;
+  std::string exr_path;
+  std::string rgb_path;
+  for (auto filepath : filepath_list) {
+    std::string file_extension = filepath.substr(filepath.find_last_of(".") + 1);
+    if (file_extension == "exr") exr_path = filepath;
+    if (file_extension == "png") rgb_path = filepath;
+  }
+  std::cout << "[OaisysPlanner]   - rgb file path: " << rgb_path << std::endl;
+  std::cout << "[OaisysPlanner]   - exr file path: " << exr_path << std::endl;
+  cv::Mat rgb_image = cv::imread(rgb_path, cv::IMREAD_COLOR);
+  cv::Mat depth_image = cv::imread(exr_path, cv::IMREAD_ANYDEPTH);
+
+  ros::Time now_stamp = ros::Time::now();
+  publishTransforms(transforms_pub, now_stamp, position, sensor_attitude);
+  publishCameraInfo(info_pub, now_stamp, position);
+  PublishViewpointImage(image_pub, rgb_image, now_stamp, sensor_msgs::image_encodings::BGR8);
+  PublishViewpointImage(depth_pub, depth_image, now_stamp, sensor_msgs::image_encodings::TYPE_32FC1);
 }
 
 Eigen::Vector4d OaisysPlanner::rpy2quaternion(double roll, double pitch, double yaw) const {
@@ -174,18 +195,18 @@ void OaisysPlanner::publishCameraInfo(const ros::Publisher &pub, const ros::Time
   pub.publish(info_msg);
 }
 
-void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const Eigen::Vector3d &position,
+void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const ros::Time time, const Eigen::Vector3d &position,
                                       Eigen::Quaterniond attitude) {
   static tf::TransformBroadcaster br;
   tf::Transform tf_transform;
 
-  //   Eigen::Vector4d offset(std::cos(0.5 * M_PI), 0.0, std::sin(0.5 * M_PI), 0.0);
-  //   Eigen::Vector4d transformed_attitude =
-  //       quatMultiplication(offset, Eigen::Vector4d(attitude.w(), attitude.x(), attitude.y(), attitude.z()));
-  //   attitude.w() = transformed_attitude(0);
-  //   attitude.x() = transformed_attitude(1);
-  //   attitude.y() = transformed_attitude(2);
-  //   attitude.z() = transformed_attitude(3);
+  Eigen::Vector4d offset = rpy2quaternion(0.0, M_PI, 0.0);
+  Eigen::Vector4d transformed_attitude =
+      quatMultiplication(Eigen::Vector4d(attitude.w(), attitude.x(), attitude.y(), attitude.z()), offset);
+  attitude.w() = transformed_attitude(0);
+  attitude.x() = transformed_attitude(1);
+  attitude.y() = transformed_attitude(2);
+  attitude.z() = transformed_attitude(3);
 
   tf_transform.setOrigin(tf::Vector3(position.x(), position.y(), position.z()));
   tf::Quaternion q(attitude.x(), attitude.y(), attitude.z(), attitude.w());
@@ -193,16 +214,16 @@ void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const Eigen::Ve
   br.sendTransform(tf::StampedTransform(tf_transform, ros::Time::now(), "map", "camera"));
 
   geometry_msgs::TransformStamped msg;
-  msg.header.stamp = ros::Time::now();
+  msg.header.stamp = time;
   msg.header.frame_id = "world";
   msg.child_frame_id = "camera";
   geometry_msgs::Transform transform;
-  transform.translation.x = -position.x();
-  transform.translation.y = -position.y();
+  transform.translation.x = position.x();
+  transform.translation.y = position.y();
   transform.translation.z = position.z();
   transform.rotation.x = attitude.x();
-  transform.rotation.y = -attitude.y();
-  transform.rotation.z = -attitude.z();
+  transform.rotation.y = attitude.y();
+  transform.rotation.z = attitude.z();
   transform.rotation.w = attitude.w();
   msg.transform = transform;
   pub.publish(msg);

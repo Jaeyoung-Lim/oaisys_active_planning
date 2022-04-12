@@ -39,12 +39,42 @@
 
 #include "oaisys_client/oaisys_planner.h"
 
+double getRandom(double min, double max) {
+  return std::abs(max - min) * static_cast<double>(rand()) / static_cast<double>(RAND_MAX) + std::min(max, min);
+}
+
 int main(int argc, char **argv) {
   ros::init(argc, argv, "oaisys_planner");
   ros::NodeHandle nh("");
   ros::NodeHandle nh_private("~");
 
   auto oaisys_planner = std::make_shared<OaisysPlanner>(nh, nh_private);
+  oaisys_planner->initialize(false);
+  Eigen::Vector3d position{0.0, 0.0, 15.0};
+
+  // Simulation Parameters
+  size_t num_iters = 10;
+  double max_angle = 0.5 * M_PI * 0.5;
+  double theta = 0.0;
+
+  for (size_t i = 0; i < num_iters; i++) {
+    std::cout << "[OaisysMapping] Step Sample: " << i << std::endl;
+    // double theta = getRandom(-max_angle, max_angle);
+    // Eigen::Vector3d axis;
+    // axis(0) = getRandom(-1.0, 1.0);
+    // axis(1) = getRandom(-1.0, 1.0);
+    // axis(2) = getRandom(-1.0, 1.0);
+    // axis.normalize();
+    // Eigen::Quaterniond attitude(std::cos(0.5 * theta), std::sin(0.5 * theta) * axis(0), std::sin(0.5 * theta) *
+    // axis(1),
+    //                     std::sin(0.5 * theta) * axis(2));
+    position += Eigen::Vector3d(0.0, 0.0, 0.0);
+    theta += M_PI / 6;
+    Eigen::Vector3d axis(0.0, 0.0, 1.0);
+    Eigen::Quaterniond attitude(std::cos(0.5 * theta), std::sin(0.5 * theta) * axis(0), std::sin(0.5 * theta) * axis(1),
+                                std::sin(0.5 * theta) * axis(2));
+    oaisys_planner->stepSample(position, attitude);
+  }
 
   ros::spin();
   return 0;
