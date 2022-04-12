@@ -1,10 +1,11 @@
 <launch>
     <node pkg="tf" type="static_transform_publisher" name="world_map" args="0 0 0 0 0 0 world map 10"/>
-    <node pkg="oaisys_client" type="test_oaisys_node" name="test_planner" output="screen">
-        <param name="image_directory" value="$(find adaptive_viewutility)/../output"/>
+    <node pkg="oaisys_client" type="oaisys_mapping_node" name="test_planner" output="screen">
         <param name="origin_x" value="0.0"/>
         <param name="origin_y" value="0.0"/>
         <param name="origin_z" value="50.0"/>
+        <param name="mounting_rotation_w" value="0.1950"/>
+        <param name="mounting_rotation_x" value="0.9807"/>
     </node>
     <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" />
     <node pkg="nodelet" type="nodelet" name="nodelet1"
@@ -15,23 +16,25 @@
         <remap from="depth_registered/points" to="/camera/depth/points"/>
     </node>
 
-    <arg name="voxel_size" default="2.0" />
+    <arg name="voxel_size" default="0.5" />
     <arg name="voxels_per_side" default="16" />
     <arg name="method" default="merged"/>
 
-   <node name="voxblox_node" pkg="voxblox_ros" type="tsdf_server" output="screen" args="-alsologtostderr" clear_params="true">
+   <node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="screen" args="-alsologtostderr" clear_params="true">
     <remap from="pointcloud" to="/camera/depth/points"/>
     <param name="tsdf_voxel_size" value="$(arg voxel_size)" />
     <param name="tsdf_voxels_per_side" value="16" />
-    <param name="voxel_carving_enabled" value="false" />
+    <param name="publish_tsdf_map" value="true" />
+    <param name="publish_esdf_map" value="true" />
+    <!-- <param name="voxel_carving_enabled" value="false" /> -->
     <param name="color_mode" value="color" />
     <param name="use_tf_transforms" value="false" />
-    <param name="update_mesh_every_n_sec" value="1.0" />
+    <param name="update_mesh_every_n_sec" value="10.0" />
     <param name="min_time_between_msgs_sec" value="0.0" />
-    <param name="method" value="fast" />
+    <param name="method" value="merged" />
     <param name="use_const_weight" value="false" />
     <param name="allow_clear" value="true" />
-    <param name="verbose" value="true" />
+    <param name="verbose" value="false" />
     <param name="world_frame" value="world" />
     <param name="sensor_frame" value="camera" />
     <remap from="transform" to="/transform" />
