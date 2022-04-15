@@ -39,6 +39,8 @@
 
 #include "oaisys_client/oaisys_planner.h"
 
+#include <visualization_msgs/MarkerArray.h>
+
 double getRandom(double min, double max) {
   return std::abs(max - min) * static_cast<double>(rand()) / static_cast<double>(RAND_MAX) + std::min(max, min);
 }
@@ -56,25 +58,33 @@ int main(int argc, char **argv) {
   size_t num_iters = 10;
   double max_angle = 0.5 * M_PI * 0.5;
   double theta = 0.0;
-
+  size_t num_steps{5};
+  Eigen::Vector3d velocity = Eigen::Vector3d(-5.0, 0.0, 0.0);
+  Eigen::Vector3d perpendicular_velocity = Eigen::Vector3d(0.0, 5.0, 0.0);
   for (size_t i = 0; i < num_iters; i++) {
     std::cout << "[OaisysMapping] Step Sample: " << i << std::endl;
+
+    if (i % num_steps == 0) {
+      velocity = -1.0 * velocity;
+      position += perpendicular_velocity;
+    } else {
+      position += velocity;
+    }
+
     // double theta = getRandom(-max_angle, max_angle);
-    // Eigen::Vector3d axis;
-    // axis(0) = getRandom(-1.0, 1.0);
-    // axis(1) = getRandom(-1.0, 1.0);
-    // axis(2) = getRandom(-1.0, 1.0);
-    // axis.normalize();
-    // Eigen::Quaterniond attitude(std::cos(0.5 * theta), std::sin(0.5 * theta) * axis(0), std::sin(0.5 * theta) *
-    // axis(1),
-    //                     std::sin(0.5 * theta) * axis(2));
-    position += Eigen::Vector3d(0.0, 0.0, 0.0);
-    theta += M_PI / 6;
-    Eigen::Vector3d axis(0.0, 0.0, 1.0);
+    double theta = 0.0;
+    Eigen::Vector3d axis;
+    axis(0) = getRandom(-1.0, 1.0);
+    axis(1) = getRandom(-1.0, 1.0);
+    axis(2) = getRandom(-1.0, 1.0);
+    axis.normalize();
+
     Eigen::Quaterniond attitude(std::cos(0.5 * theta), std::sin(0.5 * theta) * axis(0), std::sin(0.5 * theta) * axis(1),
                                 std::sin(0.5 * theta) * axis(2));
     oaisys_planner->stepSample(position, attitude);
   }
+
+  oaisys_planner->endSimulation();
 
   ros::spin();
   return 0;

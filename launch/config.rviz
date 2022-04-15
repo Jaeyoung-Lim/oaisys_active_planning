@@ -9,7 +9,6 @@ Panels:
         - /PointCloud1
         - /TF1/Frames1
         - /VoxbloxMesh1
-        - /PointCloud21
       Splitter Ratio: 0.5
     Tree Height: 311
   - Class: rviz/Selection
@@ -85,25 +84,19 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Class: rviz/TF
-      Enabled: true
+      Enabled: false
       Frame Timeout: 180
       Frames:
         All Enabled: true
-        map:
-          Value: true
-        world:
-          Value: true
       Marker Scale: 10
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        world:
-          map:
-            {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Class: rviz/Image
       Enabled: true
       Image Topic: /image
@@ -162,11 +155,7 @@ Visualization Manager:
       Marker Topic: /trajectory_visualization
       Name: MarkerArray
       Namespaces:
-        candidate_text: true
-        candidate_trajectories: true
-        canidate_gains: true
-        completed_trajectory: true
-        trajectory_evaluation: true
+        {}
       Queue Size: 100
       Value: true
     - Angle Tolerance: 0.10000000149011612
@@ -186,7 +175,7 @@ Visualization Manager:
           Scale: 1
           Value: true
         Value: true
-      Enabled: true
+      Enabled: false
       Keep: 100
       Name: Odometry
       Position Tolerance: 0.10000000149011612
@@ -202,7 +191,7 @@ Visualization Manager:
         Value: Axes
       Topic: /ground_truth/odometry
       Unreliable: false
-      Value: true
+      Value: false
     - Alpha: 0.10000000149011612
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -231,9 +220,17 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /viewpoints
+      Name: MarkerArray
+      Namespaces:
+        my_namespace: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
-    Background Color: 136; 138; 133
+    Background Color: 255; 255; 255
     Default Light: true
     Fixed Frame: map
     Frame Rate: 30
@@ -259,25 +256,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 57.955291748046875
+      Distance: 36.56864547729492
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 1.6397229433059692
-        Y: 3.054466962814331
-        Z: 7.211758613586426
+        X: -8.580992698669434
+        Y: 4.217739582061768
+        Z: 14.385828971862793
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3547990918159485
+      Pitch: 0.6697980165481567
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.19056594371795654
+      Yaw: 0.6255030632019043
     Saved: ~
 Window Geometry:
   Depth Image:

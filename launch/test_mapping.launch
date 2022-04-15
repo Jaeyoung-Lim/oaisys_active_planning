@@ -4,8 +4,12 @@
         <param name="origin_x" value="0.0"/>
         <param name="origin_y" value="0.0"/>
         <param name="origin_z" value="50.0"/>
-        <param name="mounting_rotation_w" value="0.1950"/>
-        <param name="mounting_rotation_x" value="0.9807"/>
+        <!-- <param name="mounting_rotation_w" value="0.9807"/>
+        <param name="mounting_rotation_y" value="0.1950"/> -->
+        <!-- <param name="mounting_rotation_w" value="0.8314"/>
+        <param name="mounting_rotation_y" value="0.55557"/> -->
+        <param name="mounting_rotation_w" value="1.0"/>
+        <param name="mounting_rotation_y" value="0.0"/>
     </node>
     <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" />
     <node pkg="nodelet" type="nodelet" name="nodelet1"
@@ -16,7 +20,7 @@
         <remap from="depth_registered/points" to="/camera/depth/points"/>
     </node>
 
-    <arg name="voxel_size" default="0.5" />
+    <arg name="voxel_size" default="0.05" />
     <arg name="voxels_per_side" default="16" />
     <arg name="method" default="merged"/>
 

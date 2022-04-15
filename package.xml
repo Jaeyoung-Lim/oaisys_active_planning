@@ -24,8 +24,8 @@
   <run_depend>rospy</run_depend>
   <run_depend>eigen_catkin</run_depend>
   <run_depend>oaisys_client_ros</run_depend>
-  <run_depend>voxblox_ros</run_depend>
-  <run_depend>active_3d_planning_app_reconstruction</run_depend>
+  <!-- <run_depend>voxblox_ros</run_depend>
+  <run_depend>active_3d_planning_app_reconstruction</run_depend> -->
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
