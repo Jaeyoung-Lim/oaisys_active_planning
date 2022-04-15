@@ -1,5 +1,7 @@
 #include "oaisys_client/oaisys_planner.h"
 
+#include <nav_msgs/Path.h>
+
 OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &nh_private)
     : nh_(nh), nh_private_(nh_private) {
   image_pub = nh_.advertise<sensor_msgs::Image>("image", 1, true);
@@ -7,6 +9,8 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   info_pub = nh_.advertise<sensor_msgs::CameraInfo>("info", 1, true);
   transforms_pub = nh_.advertise<geometry_msgs::TransformStamped>("transform", 1, true);
   odometry_pub = nh_.advertise<nav_msgs::Odometry>("/ground_truth/odometry", 1, true);
+  view_marker_pub = nh_.advertise<visualization_msgs::MarkerArray>("/viewpoints", 1, true);
+  path_pub = nh_.advertise<nav_msgs::Path>("/path", 1, true);
   viewpoint_sub = nh_.subscribe("/reference/command/trajectory", 1, &OaisysPlanner::multiDOFJointTrajectoryCallback,
                                 this, ros::TransportHints().tcpNoDelay());
 
@@ -26,7 +30,7 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   nh_private.param<double>("mounting_rotation_z", mounting_rotation_z, mounting_rotation_z);
   sensor_offset_ << mounting_rotation_w, mounting_rotation_x, mounting_rotation_y, mounting_rotation_z;
   sensor_offset_.normalize();
-  
+
   oaisys_client_ = std::make_shared<OaisysClient>();
 
   // Publish initial odometry
@@ -39,7 +43,7 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   view_attitude.x() = view_attitude_(1);
   view_attitude.y() = view_attitude_(2);
   view_attitude.z() = view_attitude_(3);
-  publishOdometry(odometry_pub, origin, view_attitude);
+  publishOdometry(odometry_pub, ros::Time::now(), origin, view_attitude);
 }
 
 void OaisysPlanner::initialize(bool spinner) {
@@ -88,18 +92,19 @@ void OaisysPlanner::statusloopCallback(const ros::TimerEvent &event) {
 
 void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Quaterniond &vehicle_attitude) {
   int batch_id, sample_id;
-  publishOdometry(odometry_pub, position, vehicle_attitude);
 
   Eigen::Quaterniond sensor_attitude;
   Eigen::Vector4d sensor_attitude_v = quatMultiplication(
-      Eigen::Vector4d(vehicle_attitude.w(), vehicle_attitude.x(), vehicle_attitude.y(), vehicle_attitude.z()), sensor_offset_);
+      Eigen::Vector4d(vehicle_attitude.w(), vehicle_attitude.x(), vehicle_attitude.y(), vehicle_attitude.z()),
+      sensor_offset_);
   sensor_attitude.w() = sensor_attitude_v(0);
   sensor_attitude.x() = sensor_attitude_v(1);
   sensor_attitude.y() = sensor_attitude_v(2);
   sensor_attitude.z() = sensor_attitude_v(3);
 
   Eigen::Vector3d blender_position(-position.x(), -position.y(), position.z());
-  Eigen::Quaterniond blender_attitude(sensor_attitude.w(), -sensor_attitude.x(), -sensor_attitude.y(), sensor_attitude.z());
+  Eigen::Quaterniond blender_attitude(sensor_attitude.w(), -sensor_attitude.x(), -sensor_attitude.y(),
+                                      sensor_attitude.z());
 
   oaisys_client_->StepSample(blender_position, blender_attitude, batch_id, sample_id);
   std::cout << "[OaisysPlanner] Running!: " << position.transpose() << std::endl;
@@ -129,10 +134,14 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
   cv::Mat depth_image = cv::imread(exr_path, cv::IMREAD_ANYDEPTH);
 
   ros::Time now_stamp = ros::Time::now();
+  publishOdometry(odometry_pub, now_stamp, position, vehicle_attitude);
   publishTransforms(transforms_pub, now_stamp, position, sensor_attitude);
   publishCameraInfo(info_pub, now_stamp, position);
   PublishViewpointImage(image_pub, rgb_image, now_stamp, sensor_msgs::image_encodings::BGR8);
   PublishViewpointImage(depth_pub, depth_image, now_stamp, sensor_msgs::image_encodings::TYPE_32FC1);
+  publishViewpoints(view_marker_pub, position, sensor_attitude);
+  position_history_.push_back(position);
+  publishPath(path_pub, position_history_);
 }
 
 Eigen::Vector4d OaisysPlanner::rpy2quaternion(double roll, double pitch, double yaw) const {
@@ -211,7 +220,7 @@ void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const ros::Time
   tf_transform.setOrigin(tf::Vector3(position.x(), position.y(), position.z()));
   tf::Quaternion q(attitude.x(), attitude.y(), attitude.z(), attitude.w());
   tf_transform.setRotation(q);
-  br.sendTransform(tf::StampedTransform(tf_transform, ros::Time::now(), "map", "camera"));
+  br.sendTransform(tf::StampedTransform(tf_transform, time, "map", "camera"));
 
   geometry_msgs::TransformStamped msg;
   msg.header.stamp = time;
@@ -229,10 +238,10 @@ void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const ros::Time
   pub.publish(msg);
 }
 
-void OaisysPlanner::publishOdometry(const ros::Publisher &pub, const Eigen::Vector3d &position,
+void OaisysPlanner::publishOdometry(const ros::Publisher &pub, const ros::Time time, const Eigen::Vector3d &position,
                                     Eigen::Quaterniond attitude) {
   nav_msgs::Odometry msg;
-  msg.header.stamp = ros::Time::now();
+  msg.header.stamp = time;
   msg.header.frame_id = "world";
   msg.child_frame_id = "camera";
   msg.pose.pose.position.x = position.x();
@@ -252,4 +261,119 @@ void OaisysPlanner::multiDOFJointTrajectoryCallback(const trajectory_msgs::Multi
   view_attitude_ << msg.points.back().transforms.back().rotation.w, msg.points.back().transforms.back().rotation.x,
       msg.points.back().transforms.back().rotation.y, msg.points.back().transforms.back().rotation.z;
   new_viewpoint_ = true;
+}
+
+visualization_msgs::Marker OaisysPlanner::viewpoint2MarkerMsg(int id, const Eigen::Vector3d &position,
+                                                              const Eigen::Quaterniond &attitude,
+                                                              Eigen::Vector3d color) {
+  double scale{1.5};  // Size of the viewpoint markers
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = "map";
+  marker.header.stamp = ros::Time();
+  marker.ns = "my_namespace";
+  marker.id = id;
+  marker.type = visualization_msgs::Marker::LINE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  std::vector<geometry_msgs::Point> points;
+  std::vector<Eigen::Vector3d> corner_ray_vectors;
+  corner_ray_vectors.push_back(rayVector(0, 0));
+  corner_ray_vectors.push_back(rayVector(0, image_width_));
+  corner_ray_vectors.push_back(rayVector(image_height_, image_width_));
+  corner_ray_vectors.push_back(rayVector(image_height_, 0));
+  std::vector<Eigen::Vector3d> vertex;
+  // void setOrientation(const Eigen::Vector4d &attitude) {
+  //   orientation_ = attitude;
+
+  //   // Transform corner ray vectors according to attitude
+  //   for (auto &corner_ray : corner_ray_vectors_) {
+  //   }
+  //   center_ray_vector_ = R_att * center_ray_vector_;
+  // }
+  for (auto &corner_ray : corner_ray_vectors) {
+    Eigen::Matrix3d R_att = quat2RotMatrix(Eigen::Vector4d(attitude.w(), attitude.x(), attitude.y(), attitude.z()));
+    corner_ray = R_att * corner_ray;
+    vertex.push_back(position + scale * corner_ray);
+  }
+
+  for (size_t i = 0; i < vertex.size(); i++) {
+    points.push_back(toPoint(position));  // Viewpoint center
+    points.push_back(toPoint(vertex[i]));
+    points.push_back(toPoint(vertex[i]));
+    points.push_back(toPoint(vertex[(i + 1) % vertex.size()]));
+  }
+
+  marker.points = points;
+  marker.pose.orientation.x = 0.0;
+  marker.pose.orientation.y = 0.0;
+  marker.pose.orientation.z = 0.0;
+  marker.pose.orientation.w = 1.0;
+  marker.scale.x = 0.05;
+  marker.scale.y = 0.0;
+  marker.scale.z = 0.0;
+  marker.color.a = 1.0;  // Don't forget to set the alpha!
+  marker.color.r = color(0);
+  marker.color.g = color(1);
+  marker.color.b = color(2);
+  return marker;
+}
+
+geometry_msgs::Point OaisysPlanner::toPoint(const Eigen::Vector3d &p) {
+  geometry_msgs::Point position;
+  position.x = p(0);
+  position.y = p(1);
+  position.z = p(2);
+  return position;
+}
+
+Eigen::Vector3d OaisysPlanner::rayVector(int pixel_x, int pixel_y) {
+  /// TODO: Get camera intrinsics from a file
+  int c1 = image_height_ / 2;
+  int c2 = image_width_ / 2;
+  double f = image_width_ / 2;
+
+  Eigen::Vector3d ray;
+  ray << double(pixel_x - c1) / f, double(pixel_y - c2) / f, -1.0;
+  ray.normalize();
+  return ray;
+}
+
+void OaisysPlanner::publishViewpoints(const ros::Publisher &pub, const Eigen::Vector3d &position,
+                                      const Eigen::Quaterniond &attitude) {
+  visualization_msgs::MarkerArray msg;
+
+  std::vector<visualization_msgs::Marker> marker;
+  visualization_msgs::Marker mark;
+  mark.action = visualization_msgs::Marker::DELETEALL;
+  marker.push_back(mark);
+  msg.markers = marker;
+  pub.publish(msg);
+
+  viewpoint_marker_vector_.insert(viewpoint_marker_vector_.begin(),
+                                  viewpoint2MarkerMsg(viewpoint_marker_vector_.size(), position, attitude));
+  msg.markers = viewpoint_marker_vector_;
+  pub.publish(msg);
+}
+
+void OaisysPlanner::publishPath(const ros::Publisher &pub, const std::vector<Eigen::Vector3d> path) {
+  nav_msgs::Path msg;
+  msg.header.stamp = ros::Time::now();
+  msg.header.frame_id = "map";
+  std::vector<geometry_msgs::PoseStamped> poses;
+  for (const auto &position : path) {
+    geometry_msgs::PoseStamped pose_stamped;
+    pose_stamped.pose.position = toPoint(position);
+    pose_stamped.pose.orientation.w = 1.0;
+    pose_stamped.pose.orientation.x = 0.0;
+    pose_stamped.pose.orientation.y = 0.0;
+    pose_stamped.pose.orientation.z = 0.0;
+    poses.push_back(pose_stamped);
+  }
+  msg.poses = poses;
+  pub.publish(msg);
+}
+
+void OaisysPlanner::endSimulation() {
+  bool finished{false};
+  oaisys_client_->EndSimulation(finished);
+  std::cout << "End simulation: " << finished << std::endl;
 }
