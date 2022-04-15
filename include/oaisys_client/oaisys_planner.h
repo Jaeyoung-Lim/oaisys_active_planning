@@ -55,18 +55,9 @@ class OaisysPlanner {
    * @param roll roll angle (rad)
    * @param pitch pitch angle (rad)
    * @param yaw yaw angle (rad)
-   * @return Eigen::Vector4d Quaternion as eigen vector (w, x, y, z)
+   * @return Quaternion as eigen vector (w, x, y, z)
    */
-  Eigen::Vector4d rpy2quaternion(double roll, double pitch, double yaw) const;
-
-  /**
-   * @brief Quaternion multiplication
-   *
-   * @param q
-   * @param p
-   * @return Eigen::Vector4d
-   */
-  Eigen::Vector4d quatMultiplication(const Eigen::Vector4d &q, const Eigen::Vector4d &p) const;
+  Eigen::Quaterniond rpy2quaternion(double roll, double pitch, double yaw) const;
 
   /**
    * @brief Publish cv::Mat image  into a ros topic
@@ -92,7 +83,8 @@ class OaisysPlanner {
    * @param position
    * @param attitude
    */
-  void publishOdometry(const ros::Publisher &pub, const ros::Time time, const Eigen::Vector3d &position, Eigen::Quaterniond attitude);
+  void publishOdometry(const ros::Publisher &pub, const ros::Time time, const Eigen::Vector3d &position,
+                       const Eigen::Quaterniond &attitude);
   void multiDOFJointTrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectory &msg);
   geometry_msgs::Point toPoint(const Eigen::Vector3d &p);
   visualization_msgs::Marker viewpoint2MarkerMsg(int id, const Eigen::Vector3d &position,
@@ -136,12 +128,12 @@ class OaisysPlanner {
   Eigen::Vector3d view_position_;
 
   /**
-   * @brief Attitude of viewpoint
+   * @brief Attitude of vehicle
    *
    */
-  Eigen::Vector4d view_attitude_;
+  Eigen::Quaterniond view_attitude_;
 
-  Eigen::Vector4d sensor_offset_{Eigen::Vector4d(std::cos(0.5 * M_PI / 4), 0.0, -std::sin(0.5 * M_PI / 4), 0.0)};
+  Eigen::Quaterniond sensor_offset_{Eigen::Quaterniond(std::cos(0.5 * M_PI / 4), 0.0, -std::sin(0.5 * M_PI / 4), 0.0)};
 
   std::vector<visualization_msgs::Marker> viewpoint_marker_vector_;
   std::vector<Eigen::Vector3d> position_history_;

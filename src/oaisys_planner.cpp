@@ -20,6 +20,7 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   nh_private.param<double>("origin_y", origin_y, origin_y);
   nh_private.param<double>("origin_z", origin_z, origin_z);
   double mounting_rotation_w{1.0};
+
   double mounting_rotation_x{0.0};
   double mounting_rotation_y{0.0};
   double mounting_rotation_z{0.0};
@@ -28,7 +29,9 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   nh_private.param<double>("mounting_rotation_x", mounting_rotation_x, mounting_rotation_x);
   nh_private.param<double>("mounting_rotation_y", mounting_rotation_y, mounting_rotation_y);
   nh_private.param<double>("mounting_rotation_z", mounting_rotation_z, mounting_rotation_z);
-  sensor_offset_ << mounting_rotation_w, mounting_rotation_x, mounting_rotation_y, mounting_rotation_z;
+  
+  sensor_offset_ =
+      Eigen::Quaterniond(mounting_rotation_w, mounting_rotation_x, mounting_rotation_y, mounting_rotation_z);
   sensor_offset_.normalize();
 
   oaisys_client_ = std::make_shared<OaisysClient>();
@@ -36,13 +39,9 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   // Publish initial odometry
   const Eigen::Vector3d origin(origin_x, origin_y, origin_z);
   view_position_ = origin;
-  Eigen::Vector3d vehicle_vel(15.0, 0.0, 0.0);
-  view_attitude_ = rpy2quaternion(0.0, 0.0 / 180 * M_PI, 0.0);
-  Eigen::Quaterniond view_attitude;
-  view_attitude.w() = view_attitude_(0);
-  view_attitude.x() = view_attitude_(1);
-  view_attitude.y() = view_attitude_(2);
-  view_attitude.z() = view_attitude_(3);
+  Eigen::Quaterniond view_attitude = rpy2quaternion(0.0, 0.0 / 180 * M_PI, 0.0);
+  view_attitude_ = view_attitude;
+
   publishOdometry(odometry_pub, ros::Time::now(), origin, view_attitude);
 }
 
@@ -78,12 +77,7 @@ void OaisysPlanner::statusloopCallback(const ros::TimerEvent &event) {
   if (new_viewpoint_) {
     const std::lock_guard<std::mutex> lock(viewpoint_mutex);
     std::cout << "[OaisysPlanner] Adding new viewpoint" << std::endl;
-    Eigen::Quaterniond vehicle_attitude;
-    vehicle_attitude.w() = view_attitude_(0);
-    vehicle_attitude.x() = view_attitude_(1);
-    vehicle_attitude.y() = view_attitude_(2);
-    vehicle_attitude.z() = view_attitude_(3);
-    stepSample(view_position_, vehicle_attitude);
+    stepSample(view_position_, view_attitude_);
     new_viewpoint_ = false;
   } else {
     std::cout << "[OaisysPlanner] Waiting for viewpoint..." << std::endl;
@@ -93,14 +87,7 @@ void OaisysPlanner::statusloopCallback(const ros::TimerEvent &event) {
 void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Quaterniond &vehicle_attitude) {
   int batch_id, sample_id;
 
-  Eigen::Quaterniond sensor_attitude;
-  Eigen::Vector4d sensor_attitude_v = quatMultiplication(
-      Eigen::Vector4d(vehicle_attitude.w(), vehicle_attitude.x(), vehicle_attitude.y(), vehicle_attitude.z()),
-      sensor_offset_);
-  sensor_attitude.w() = sensor_attitude_v(0);
-  sensor_attitude.x() = sensor_attitude_v(1);
-  sensor_attitude.y() = sensor_attitude_v(2);
-  sensor_attitude.z() = sensor_attitude_v(3);
+  Eigen::Quaterniond sensor_attitude = vehicle_attitude * sensor_offset_;
 
   Eigen::Vector3d blender_position(-position.x(), -position.y(), position.z());
   Eigen::Quaterniond blender_attitude(sensor_attitude.w(), -sensor_attitude.x(), -sensor_attitude.y(),
@@ -144,30 +131,11 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
   publishPath(path_pub, position_history_);
 }
 
-Eigen::Vector4d OaisysPlanner::rpy2quaternion(double roll, double pitch, double yaw) const {
-  double cy = std::cos(yaw * 0.5);
-  double sy = std::sin(yaw * 0.5);
-  double cp = std::cos(pitch * 0.5);
-  double sp = std::sin(pitch * 0.5);
-  double cr = std::cos(roll * 0.5);
-  double sr = std::sin(roll * 0.5);
-
-  Eigen::Vector4d q;
-  q(0) = cr * cp * cy + sr * sp * sy;
-  q(1) = sr * cp * cy - cr * sp * sy;
-  q(2) = cr * sp * cy + sr * cp * sy;
-  q(3) = cr * cp * sy - sr * sp * cy;
-
-  q.normalize();
-
+Eigen::Quaterniond OaisysPlanner::rpy2quaternion(double roll, double pitch, double yaw) const {
+  Eigen::Quaterniond q = Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
+                         Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
+                         Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ());
   return q;
-}
-
-Eigen::Vector4d OaisysPlanner::quatMultiplication(const Eigen::Vector4d &q, const Eigen::Vector4d &p) const {
-  Eigen::Vector4d quat;
-  quat << p(0) * q(0) - p(1) * q(1) - p(2) * q(2) - p(3) * q(3), p(0) * q(1) + p(1) * q(0) - p(2) * q(3) + p(3) * q(2),
-      p(0) * q(2) + p(1) * q(3) + p(2) * q(0) - p(3) * q(1), p(0) * q(3) - p(1) * q(2) + p(2) * q(1) + p(3) * q(0);
-  return quat;
 }
 
 void OaisysPlanner::PublishViewpointImage(const ros::Publisher &pub, const cv::Mat &image, const ros::Time time,
@@ -209,13 +177,8 @@ void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const ros::Time
   static tf::TransformBroadcaster br;
   tf::Transform tf_transform;
 
-  Eigen::Vector4d offset = rpy2quaternion(0.0, M_PI, 0.0);
-  Eigen::Vector4d transformed_attitude =
-      quatMultiplication(Eigen::Vector4d(attitude.w(), attitude.x(), attitude.y(), attitude.z()), offset);
-  attitude.w() = transformed_attitude(0);
-  attitude.x() = transformed_attitude(1);
-  attitude.y() = transformed_attitude(2);
-  attitude.z() = transformed_attitude(3);
+  Eigen::Quaterniond offset = rpy2quaternion(0.0, M_PI, 0.0);
+  attitude = attitude * offset;
 
   tf_transform.setOrigin(tf::Vector3(position.x(), position.y(), position.z()));
   tf::Quaternion q(attitude.x(), attitude.y(), attitude.z(), attitude.w());
@@ -239,7 +202,7 @@ void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const ros::Time
 }
 
 void OaisysPlanner::publishOdometry(const ros::Publisher &pub, const ros::Time time, const Eigen::Vector3d &position,
-                                    Eigen::Quaterniond attitude) {
+                                    const Eigen::Quaterniond &attitude) {
   nav_msgs::Odometry msg;
   msg.header.stamp = time;
   msg.header.frame_id = "world";
@@ -258,8 +221,8 @@ void OaisysPlanner::multiDOFJointTrajectoryCallback(const trajectory_msgs::Multi
   const std::lock_guard<std::mutex> lock(viewpoint_mutex);
   view_position_ << msg.points.back().transforms.back().translation.x,
       msg.points.back().transforms.back().translation.y, msg.points.back().transforms.back().translation.z;
-  view_attitude_ << msg.points.back().transforms.back().rotation.w, msg.points.back().transforms.back().rotation.x,
-      msg.points.back().transforms.back().rotation.y, msg.points.back().transforms.back().rotation.z;
+  view_attitude_ = Eigen::Quaterniond(msg.points.back().transforms.back().rotation.w, msg.points.back().transforms.back().rotation.x,
+      msg.points.back().transforms.back().rotation.y, msg.points.back().transforms.back().rotation.z);
   new_viewpoint_ = true;
 }
 
