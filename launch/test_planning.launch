@@ -19,6 +19,7 @@
     <arg name="voxel_size" default="0.5" />
     <arg name="voxels_per_side" default="16" />
     <arg name="method" default="merged"/>
+    <arg name="max_ray_length_m" default="50" />
   
    <node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="screen" args="-alsologtostderr" clear_params="true">
     <remap from="pointcloud" to="/camera/depth/points"/>
@@ -38,7 +39,7 @@
     <param name="world_frame" value="world" />
     <param name="sensor_frame" value="camera" />
     <remap from="transform" to="/transform" />
-    <param name="max_ray_length_m" value="100.0" />
+    <param name="max_ray_length_m" value="$(arg max_ray_length_m)" />
     <param name="mesh_filename" value="$(find voxblox_ros)/mesh_results/$(anon cow).ply" />
   </node>
 
@@ -54,7 +55,7 @@
   <!-- Planner -->
   <node name="planner_node" pkg="active_3d_planning_app_reconstruction" type="reconstruction_planner_node" output="screen">
     <!-- Voxblox Server -->
-    <param name="max_ray_length_m" value="30.0" />
+    <param name="max_ray_length_m" value="$(arg max_ray_length_m)" />
     <remap from="planner_node/esdf_map_in" to="/voxblox_node/esdf_map_out" />
     <remap from="planner_node/tsdf_map_in" to="/voxblox_node/tsdf_map_out" />
     <param name="use_tf_transforms" value="false" />

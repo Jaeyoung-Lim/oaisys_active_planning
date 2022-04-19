@@ -119,6 +119,9 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
   std::cout << "[OaisysPlanner]   - exr file path: " << exr_path << std::endl;
   cv::Mat rgb_image = cv::imread(rgb_path, cv::IMREAD_COLOR);
   cv::Mat depth_image = cv::imread(exr_path, cv::IMREAD_ANYDEPTH);
+  // Threshold depth value so that freespace can be cleared up in voxblox
+  cv::threshold(depth_image, depth_image, 51.0, -1, cv::ThresholdTypes::THRESH_TRUNC);
+
 
   ros::Time now_stamp = ros::Time::now();
   publishOdometry(odometry_pub, now_stamp, position, vehicle_attitude);
