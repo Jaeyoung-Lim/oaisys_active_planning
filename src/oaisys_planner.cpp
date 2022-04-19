@@ -92,7 +92,7 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
   Eigen::Vector3d blender_position(-position.x(), -position.y(), position.z());
   Eigen::Quaterniond blender_attitude(sensor_attitude.w(), -sensor_attitude.x(), -sensor_attitude.y(),
                                       sensor_attitude.z());
-
+  blender_attitude = blender_attitude * blender_offset_;
   oaisys_client_->StepSample(blender_position, blender_attitude, batch_id, sample_id);
   std::cout << "[OaisysPlanner] Running!: " << position.transpose() << std::endl;
   std::cout << "[OaisysPlanner]   - batch ID: " << batch_id << std::endl;
@@ -180,7 +180,7 @@ void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const ros::Time
   static tf::TransformBroadcaster br;
   tf::Transform tf_transform;
 
-  Eigen::Quaterniond offset = rpy2quaternion(0.0, M_PI, 0.0);
+  Eigen::Quaterniond offset = rpy2quaternion(0.0, M_PI, M_PI/2);
   attitude = attitude * offset;
 
   tf_transform.setOrigin(tf::Vector3(position.x(), position.y(), position.z()));
@@ -226,6 +226,8 @@ void OaisysPlanner::multiDOFJointTrajectoryCallback(const trajectory_msgs::Multi
       msg.points.back().transforms.back().translation.y, msg.points.back().transforms.back().translation.z;
   view_attitude_ = Eigen::Quaterniond(msg.points.back().transforms.back().rotation.w, msg.points.back().transforms.back().rotation.x,
       msg.points.back().transforms.back().rotation.y, msg.points.back().transforms.back().rotation.z);
+  ///TODO: This is a workaround with a wierd attitude offset
+  view_attitude_ = view_attitude_ * Eigen::Quaterniond(0.0, 0.0, 0.0, 1.0);
   new_viewpoint_ = true;
 }
 
