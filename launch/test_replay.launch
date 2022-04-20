@@ -1,0 +1,16 @@
+<launch>
+    <node pkg="tf" type="static_transform_publisher" name="world_map" args="0 0 0 0 0 0 world map 10"/>
+    <node pkg="oaisys_client" type="oaisys_replay_node" name="test_planner" output="screen">
+        <param name="file_path" value="$(find oaisys_client)/resources/sensor_left/poses.txt"/>
+        <param name="image_dir" value="$(find oaisys_client)/resources/sensor_left"/>
+    </node>
+    <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" />
+    <node pkg="nodelet" type="nodelet" name="nodelet1"
+            args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager">
+        <remap from="rgb/camera_info" to="/info"/>
+        <remap from="rgb/image_rect_color" to="/image"/>
+        <remap from="depth_registered/image_rect" to="/depth"/>
+        <remap from="depth_registered/points" to="/camera/depth/points"/>
+    </node>
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find oaisys_client)/launch/config.rviz" />
+</launch>
