@@ -59,8 +59,8 @@ int main(int argc, char **argv) {
   double max_angle = 0.5 * M_PI * 0.5;
   double theta = 0.0;
   size_t num_steps{5};
-  Eigen::Vector3d velocity = Eigen::Vector3d(-5.0, 0.0, 0.0);
-  Eigen::Vector3d perpendicular_velocity = Eigen::Vector3d(0.0, 5.0, 0.0);
+  Eigen::Vector3d velocity = Eigen::Vector3d(0.0, 0.0, -5.0);
+  Eigen::Vector3d perpendicular_velocity = Eigen::Vector3d(0.0, 0.0, 0.0);
   for (size_t i = 0; i < num_iters; i++) {
     std::cout << "[OaisysMapping] Step Sample: " << i << std::endl;
 
