@@ -92,8 +92,8 @@ int main(int argc, char **argv) {
 
   while (true) {
     for (size_t i = 0; i < position.size(); i++) {
-      std::string rgb_path = dir_path + "/000" + std::to_string(i) + "sensor_left_rgb_00.png";
-      std::string depth_path = dir_path + "/000" + std::to_string(i) + "sensor_left_pinhole_depth_00.exr";
+      std::string rgb_path = dir_path + "/000" + std::to_string(i+2) + "sensor_left_rgb_00.png";
+      std::string depth_path = dir_path + "/000" + std::to_string(i+2) + "sensor_left_pinhole_depth_00.exr";
       std::cout << "[OaisysPlanner]   - position   : " << position[i].transpose() << std::endl;
       std::cout << "[OaisysPlanner]   - rgb_path   : " << rgb_path << std::endl;
       std::cout << "[OaisysPlanner]   - depth_path : " << depth_path << std::endl;

@@ -137,18 +137,20 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
 
 void OaisysPlanner::publishPointClouds(const Eigen::Vector3d &position, const Eigen::Quaterniond &attitude,
                                        const std::string rgb_path, const std::string depth_path) {
+  Eigen::Quaterniond sensor_attitude = attitude * rpy2quaternion(M_PI, -M_PI/2, 0.0);
+
   cv::Mat rgb_image = cv::imread(rgb_path, cv::IMREAD_COLOR);
   cv::Mat depth_image = cv::imread(depth_path, cv::IMREAD_ANYDEPTH);
   // Threshold depth value so that freespace can be cleared up in voxblox
   cv::threshold(depth_image, depth_image, 51.0, -1, cv::ThresholdTypes::THRESH_TRUNC);
 
   ros::Time now_stamp = ros::Time::now();
-  publishOdometry(odometry_pub, now_stamp, position, attitude);
-  publishTransforms(transforms_pub, now_stamp, position, attitude);
+  publishOdometry(odometry_pub, now_stamp, position, sensor_attitude);
+  publishTransforms(transforms_pub, now_stamp, position, sensor_attitude);
   publishCameraInfo(info_pub, now_stamp, position);
   PublishViewpointImage(image_pub, rgb_image, now_stamp, sensor_msgs::image_encodings::BGR8);
   PublishViewpointImage(depth_pub, depth_image, now_stamp, sensor_msgs::image_encodings::TYPE_32FC1);
-  publishViewpoints(view_marker_pub, position, attitude);
+  publishViewpoints(view_marker_pub, position, sensor_attitude);
   position_history_.push_back(position);
   publishPath(path_pub, position_history_);
 }
