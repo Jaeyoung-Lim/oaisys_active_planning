@@ -9,6 +9,7 @@ Panels:
         - /PointCloud1
         - /TF1/Frames1
         - /VoxbloxMesh1
+        - /Path1
       Splitter Ratio: 0.5
     Tree Height: 311
   - Class: rviz/Selection
@@ -41,7 +42,7 @@ Visualization Manager:
       Cell Size: 1
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -54,7 +55,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Alpha: 0.30000001192092896
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -147,7 +148,7 @@ Visualization Manager:
       Radius: 0.029999999329447746
       Shaft Diameter: 0.10000000149011612
       Shaft Length: 0.10000000149011612
-      Topic: /camera_path
+      Topic: /path
       Unreliable: false
       Value: true
     - Class: rviz/MarkerArray
@@ -256,25 +257,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 36.56864547729492
+      Distance: 71.98477935791016
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -8.580992698669434
-        Y: 4.217739582061768
-        Z: 14.385828971862793
+        X: 2.435844659805298
+        Y: 4.578668117523193
+        Z: -6.411651134490967
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6697980165481567
+      Pitch: 0.5997970700263977
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.6255030632019043
+      Yaw: 0.6355014443397522
     Saved: ~
 Window Geometry:
   Depth Image:
