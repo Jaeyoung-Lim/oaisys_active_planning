@@ -117,10 +117,11 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
   }
 
   /// TODO: Read
-  std::cout << "[OaisysPlanner]   - rgb file path: " << rgb_path << std::endl;
-  std::cout << "[OaisysPlanner]   - exr file path: " << exr_path << std::endl;
+  // std::cout << "[OaisysPlanner]   - rgb file path: " << rgb_path << std::endl;
+  // std::cout << "[OaisysPlanner]   - exr file path: " << exr_path << std::endl;
   cv::Mat rgb_image = cv::imread(rgb_path, cv::IMREAD_COLOR);
   cv::Mat depth_image = cv::imread(exr_path, cv::IMREAD_ANYDEPTH);
+  depth_image = depth_image.mul(1.0/1.0855);
   // Threshold depth value so that freespace can be cleared up in voxblox
   cv::threshold(depth_image, depth_image, 51.0, -1, cv::ThresholdTypes::THRESH_TRUNC);
 
@@ -141,6 +142,10 @@ void OaisysPlanner::publishPointClouds(const Eigen::Vector3d &position, const Ei
 
   cv::Mat rgb_image = cv::imread(rgb_path, cv::IMREAD_COLOR);
   cv::Mat depth_image = cv::imread(depth_path, cv::IMREAD_ANYDEPTH);
+  depth_image = depth_image.mul(1.0/1.0855);
+
+  // std::cout.precision(17);
+  std::cout << "[OaisysPlanner]    - depth: "<< depth_image.at<float>(511, 511) << std::endl;
   // Threshold depth value so that freespace can be cleared up in voxblox
   cv::threshold(depth_image, depth_image, 51.0, -1, cv::ThresholdTypes::THRESH_TRUNC);
 
@@ -173,12 +178,12 @@ void OaisysPlanner::publishCameraInfo(const ros::Publisher &pub, const ros::Time
   info_msg.header.frame_id = "camera";
   info_msg.P[0] = 541.14;
   info_msg.P[1] = 0;
-  info_msg.P[2] = 320;
+  info_msg.P[2] = image_width_/2;
   info_msg.P[3] = 0.0;
 
   info_msg.P[4] = 0;
   info_msg.P[5] = 541.14;
-  info_msg.P[6] = 240;
+  info_msg.P[6] = image_height_/2;
   info_msg.P[7] = 0.0;
 
   info_msg.P[8] = 0;
