@@ -140,8 +140,9 @@ class OaisysPlanner {
   std::vector<Eigen::Vector3d> position_history_;
   bool new_viewpoint_{true};
   bool batch_created_{false};
-  int image_width_ = 1440;
-  int image_height_ = 1080;
+  int image_width_ = 640;
+  int image_height_ = 480;
+  double focal_length_ = 541.14;
 };
 
 #endif

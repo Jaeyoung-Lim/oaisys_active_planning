@@ -157,14 +157,14 @@ void OaisysPlanner::publishCameraInfo(const ros::Publisher &pub, const ros::Time
   sensor_msgs::CameraInfo info_msg;
   info_msg.header.stamp = time;
   info_msg.header.frame_id = "camera";
-  info_msg.P[0] = 541.14;
+  info_msg.P[0] = focal_length_;
   info_msg.P[1] = 0;
-  info_msg.P[2] = 320;
+  info_msg.P[2] = image_width_/2;
   info_msg.P[3] = 0.0;
 
   info_msg.P[4] = 0;
-  info_msg.P[5] = 541.14;
-  info_msg.P[6] = 240;
+  info_msg.P[5] = focal_length_;
+  info_msg.P[6] = image_height_/2;
   info_msg.P[7] = 0.0;
 
   info_msg.P[8] = 0;
