@@ -3,7 +3,7 @@
     <node pkg="oaisys_client" type="oaisys_mapping_node" name="test_planner" output="screen">
         <param name="origin_x" value="0.0"/>
         <param name="origin_y" value="0.0"/>
-        <param name="origin_z" value="50.0"/>
+        <param name="origin_z" value="15.0"/>
         <!-- <param name="mounting_rotation_w" value="0.9807"/>
         <param name="mounting_rotation_y" value="0.1950"/> -->
         <!-- <param name="mounting_rotation_w" value="0.8314"/>

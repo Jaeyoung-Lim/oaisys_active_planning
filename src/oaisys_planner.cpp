@@ -29,7 +29,7 @@ OaisysPlanner::OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &n
   nh_private.param<double>("mounting_rotation_x", mounting_rotation_x, mounting_rotation_x);
   nh_private.param<double>("mounting_rotation_y", mounting_rotation_y, mounting_rotation_y);
   nh_private.param<double>("mounting_rotation_z", mounting_rotation_z, mounting_rotation_z);
-  
+
   sensor_offset_ =
       Eigen::Quaterniond(mounting_rotation_w, mounting_rotation_x, mounting_rotation_y, mounting_rotation_z);
   sensor_offset_.normalize();
@@ -92,7 +92,7 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
   Eigen::Vector3d blender_position(-position.x(), -position.y(), position.z());
   Eigen::Quaterniond blender_attitude(sensor_attitude.w(), -sensor_attitude.x(), -sensor_attitude.y(),
                                       sensor_attitude.z());
-
+  blender_attitude = blender_attitude * blender_offset_;
   oaisys_client_->StepSample(blender_position, blender_attitude, batch_id, sample_id);
   std::cout << "[OaisysPlanner] Running!: " << position.transpose() << std::endl;
   std::cout << "[OaisysPlanner]   - batch ID: " << batch_id << std::endl;
@@ -115,10 +115,15 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
     if (file_extension == "exr") exr_path = filepath;
     if (file_extension == "png") rgb_path = filepath;
   }
-  std::cout << "[OaisysPlanner]   - rgb file path: " << rgb_path << std::endl;
-  std::cout << "[OaisysPlanner]   - exr file path: " << exr_path << std::endl;
+
+  /// TODO: Read
+  // std::cout << "[OaisysPlanner]   - rgb file path: " << rgb_path << std::endl;
+  // std::cout << "[OaisysPlanner]   - exr file path: " << exr_path << std::endl;
   cv::Mat rgb_image = cv::imread(rgb_path, cv::IMREAD_COLOR);
   cv::Mat depth_image = cv::imread(exr_path, cv::IMREAD_ANYDEPTH);
+  depth_image = depth_image.mul(1.0/1.0855);
+  // Threshold depth value so that freespace can be cleared up in voxblox
+  cv::threshold(depth_image, depth_image, 51.0, -1, cv::ThresholdTypes::THRESH_TRUNC);
 
   ros::Time now_stamp = ros::Time::now();
   publishOdometry(odometry_pub, now_stamp, position, vehicle_attitude);
@@ -131,11 +136,28 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
   publishPath(path_pub, position_history_);
 }
 
-Eigen::Quaterniond OaisysPlanner::rpy2quaternion(double roll, double pitch, double yaw) const {
-  Eigen::Quaterniond q = Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
-                         Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
-                         Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ());
-  return q;
+void OaisysPlanner::publishPointClouds(const Eigen::Vector3d &position, const Eigen::Quaterniond &attitude,
+                                       const std::string rgb_path, const std::string depth_path) {
+  Eigen::Quaterniond sensor_attitude = attitude * rpy2quaternion(M_PI, -M_PI/2, 0.0);
+
+  cv::Mat rgb_image = cv::imread(rgb_path, cv::IMREAD_COLOR);
+  cv::Mat depth_image = cv::imread(depth_path, cv::IMREAD_ANYDEPTH);
+  depth_image = depth_image.mul(1.0/1.0855);
+
+  // std::cout.precision(17);
+  std::cout << "[OaisysPlanner]    - depth: "<< depth_image.at<float>(511, 511) << std::endl;
+  // Threshold depth value so that freespace can be cleared up in voxblox
+  cv::threshold(depth_image, depth_image, 51.0, -1, cv::ThresholdTypes::THRESH_TRUNC);
+
+  ros::Time now_stamp = ros::Time::now();
+  publishOdometry(odometry_pub, now_stamp, position, sensor_attitude);
+  publishTransforms(transforms_pub, now_stamp, position, sensor_attitude);
+  publishCameraInfo(info_pub, now_stamp, position);
+  PublishViewpointImage(image_pub, rgb_image, now_stamp, sensor_msgs::image_encodings::BGR8);
+  PublishViewpointImage(depth_pub, depth_image, now_stamp, sensor_msgs::image_encodings::TYPE_32FC1);
+  publishViewpoints(view_marker_pub, position, sensor_attitude);
+  position_history_.push_back(position);
+  publishPath(path_pub, position_history_);
 }
 
 void OaisysPlanner::PublishViewpointImage(const ros::Publisher &pub, const cv::Mat &image, const ros::Time time,
@@ -156,12 +178,12 @@ void OaisysPlanner::publishCameraInfo(const ros::Publisher &pub, const ros::Time
   info_msg.header.frame_id = "camera";
   info_msg.P[0] = 541.14;
   info_msg.P[1] = 0;
-  info_msg.P[2] = 320;
+  info_msg.P[2] = image_width_/2;
   info_msg.P[3] = 0.0;
 
   info_msg.P[4] = 0;
   info_msg.P[5] = 541.14;
-  info_msg.P[6] = 240;
+  info_msg.P[6] = image_height_/2;
   info_msg.P[7] = 0.0;
 
   info_msg.P[8] = 0;
@@ -177,7 +199,7 @@ void OaisysPlanner::publishTransforms(const ros::Publisher &pub, const ros::Time
   static tf::TransformBroadcaster br;
   tf::Transform tf_transform;
 
-  Eigen::Quaterniond offset = rpy2quaternion(0.0, M_PI, 0.0);
+  Eigen::Quaterniond offset = rpy2quaternion(0.0, M_PI, M_PI / 2);
   attitude = attitude * offset;
 
   tf_transform.setOrigin(tf::Vector3(position.x(), position.y(), position.z()));
@@ -221,8 +243,11 @@ void OaisysPlanner::multiDOFJointTrajectoryCallback(const trajectory_msgs::Multi
   const std::lock_guard<std::mutex> lock(viewpoint_mutex);
   view_position_ << msg.points.back().transforms.back().translation.x,
       msg.points.back().transforms.back().translation.y, msg.points.back().transforms.back().translation.z;
-  view_attitude_ = Eigen::Quaterniond(msg.points.back().transforms.back().rotation.w, msg.points.back().transforms.back().rotation.x,
+  view_attitude_ = Eigen::Quaterniond(
+      msg.points.back().transforms.back().rotation.w, msg.points.back().transforms.back().rotation.x,
       msg.points.back().transforms.back().rotation.y, msg.points.back().transforms.back().rotation.z);
+  /// TODO: This is a workaround with a wierd attitude offset
+  view_attitude_ = view_attitude_ * Eigen::Quaterniond(0.0, 0.0, 0.0, 1.0);
   new_viewpoint_ = true;
 }
 

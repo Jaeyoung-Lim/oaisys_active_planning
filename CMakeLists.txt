@@ -44,3 +44,9 @@ add_executable(oaisys_mapping_node
 )
 add_dependencies(oaisys_mapping_node ${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(oaisys_mapping_node ${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} pthread)
+
+add_executable(oaisys_replay_node
+  src/oaisys_replay_node.cpp
+)
+add_dependencies(oaisys_replay_node ${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(oaisys_replay_node ${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} pthread)

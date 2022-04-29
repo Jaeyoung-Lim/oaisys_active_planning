@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
   Eigen::Vector3d position{0.0, 0.0, 15.0};
 
   // Simulation Parameters
-  size_t num_iters = 10;
+  size_t num_iters = 30;
   double max_angle = 0.5 * M_PI * 0.5;
   double theta = 0.0;
   size_t num_steps{5};

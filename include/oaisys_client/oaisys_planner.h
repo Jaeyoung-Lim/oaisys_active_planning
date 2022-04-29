@@ -1,7 +1,7 @@
 #ifndef OAISYS_PLANNER_H
 #define OAISYS_PLANNER_H
 
-#include "oaisys_client_ros/oaisys_client.h"
+#include <oaisys_client_ros/oaisys_client.h>
 
 #include <ros/callback_queue.h>
 
@@ -22,6 +22,8 @@
 
 #include <mutex>
 
+#include "oaisys_client/common.h"
+
 class OaisysPlanner {
  public:
   OaisysPlanner(const ros::NodeHandle &nh, const ros::NodeHandle &nh_private);
@@ -39,6 +41,17 @@ class OaisysPlanner {
    */
   void stepSample(const Eigen::Vector3d &position, const Eigen::Quaterniond &vehicle_attitude);
 
+  /**
+   * @brief
+   *
+   * @param position
+   * @param attitude
+   * @param rgb_path
+   * @param depth_path
+   */
+  void publishPointClouds(const Eigen::Vector3d &position, const Eigen::Quaterniond &attitude,
+                          const std::string rgb_path, const std::string depth_path);
+
   void endSimulation();
 
  private:
@@ -48,16 +61,6 @@ class OaisysPlanner {
    * @param event
    */
   void statusloopCallback(const ros::TimerEvent &event);
-
-  /**
-   * @brief Convert roll pitch yaw to quaternions
-   *
-   * @param roll roll angle (rad)
-   * @param pitch pitch angle (rad)
-   * @param yaw yaw angle (rad)
-   * @return Quaternion as eigen vector (w, x, y, z)
-   */
-  Eigen::Quaterniond rpy2quaternion(double roll, double pitch, double yaw) const;
 
   /**
    * @brief Publish cv::Mat image  into a ros topic
@@ -134,13 +137,14 @@ class OaisysPlanner {
   Eigen::Quaterniond view_attitude_;
 
   Eigen::Quaterniond sensor_offset_{Eigen::Quaterniond(std::cos(0.5 * M_PI / 4), 0.0, -std::sin(0.5 * M_PI / 4), 0.0)};
+  Eigen::Quaterniond blender_offset_{Eigen::Quaterniond(std::cos(0.5 * M_PI / 2), 0.0, 0.0, -std::sin(0.5 * M_PI / 2))};
 
   std::vector<visualization_msgs::Marker> viewpoint_marker_vector_;
   std::vector<Eigen::Vector3d> position_history_;
   bool new_viewpoint_{true};
   bool batch_created_{false};
-  int image_width_ = 1440;
-  int image_height_ = 1080;
+  int image_width_ = 640;
+  int image_height_ = 480;
 };
 
 #endif
