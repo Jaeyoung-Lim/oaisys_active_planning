@@ -112,7 +112,7 @@ void OaisysPlanner::stepSample(const Eigen::Vector3d &position, const Eigen::Qua
   std::string rgb_path;
   for (auto filepath : filepath_list) {
     std::string file_extension = filepath.substr(filepath.find_last_of(".") + 1);
-    if (file_extension == "exr") exr_path = filepath;
+    if (file_extension == "tif") exr_path = filepath;
     if (file_extension == "png") rgb_path = filepath;
   }
 
