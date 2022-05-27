@@ -134,6 +134,7 @@ class OaisysPlanner {
   Eigen::Quaterniond view_attitude_;
 
   Eigen::Quaterniond sensor_offset_{Eigen::Quaterniond(std::cos(0.5 * M_PI / 4), 0.0, -std::sin(0.5 * M_PI / 4), 0.0)};
+  Eigen::Quaterniond blender_offset_{Eigen::Quaterniond(std::cos(0.5 * M_PI / 2), 0.0, 0.0, -std::sin(0.5 * M_PI / 2))};
 
   std::vector<visualization_msgs::Marker> viewpoint_marker_vector_;
   std::vector<Eigen::Vector3d> position_history_;
