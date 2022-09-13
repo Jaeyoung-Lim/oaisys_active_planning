@@ -28,4 +28,13 @@ roslaunch oaisys_client test_planning
 ![active_mapping](https://user-images.githubusercontent.com/5248102/170708512-55ae0569-9e6d-4eb1-8231-98fa596f27a5.png)
 
 ## Additional Information
-This work has been presented  presented as a workshop paper at [ICRA 2022 Workshop on Releasing Robots into the Wild: Simulations, Benchmarks, and Deployment](https://www.dynsyslab.org/releasing-robots-into-the-wild-workshop/). The paper can be found in the workshop website
+This work has been presented  presented as a workshop paper at [ICRA 2022 Workshop on Releasing Robots into the Wild: Simulations, Benchmarks, and Deployment](https://www.dynsyslab.org/releasing-robots-into-the-wild-workshop/).[pdf](https://elib.dlr.de/188049/1/interactive_oaisys_ws_paper_revised.pdf)
+
+```
+@inproceedings{muller2022interactive,
+  title={Interactive OAISYS: A photorealistic terrain simulation for robotics research},
+  author={M{\"u}ller, Marcus Gerhard and Lim, Jaeyoung and Schmid, Lukas and Blum, Hermann and St{\"u}rzl, Wolfgang and Gawel, Abel and Siegwart, Roland and Triebel, Rudolph},
+  booktitle={ICRA 2022 Workshop on Releasing Robots into the Wild: Simulations, Benchmarks, and Deployment},
+  year={2022}
+}
+```
