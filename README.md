@@ -28,7 +28,8 @@ roslaunch oaisys_client test_planning
 ![active_mapping](https://user-images.githubusercontent.com/5248102/170708512-55ae0569-9e6d-4eb1-8231-98fa596f27a5.png)
 
 ## Additional Information
-This work has been presented  presented as a workshop paper at [ICRA 2022 Workshop on Releasing Robots into the Wild: Simulations, Benchmarks, and Deployment](https://www.dynsyslab.org/releasing-robots-into-the-wild-workshop/).[pdf](https://elib.dlr.de/188049/1/interactive_oaisys_ws_paper_revised.pdf)
+This work has been presented  presented as a workshop paper at [ICRA 2022 Workshop on Releasing Robots into the Wild: Simulations, Benchmarks, and Deployment](https://www.dynsyslab.org/releasing-robots-into-the-wild-workshop/).
+[[workshop](https://www.dynsyslab.org/releasing-robots-into-the-wild-workshop/).][[paper](https://elib.dlr.de/188049/1/interactive_oaisys_ws_paper_revised.pdf)]
 
 ```
 @inproceedings{muller2022interactive,
